@@ -1,0 +1,46 @@
+classDiagram
+    class ApiHelpers {
+        +get_or_404(item, detail) T
+        +commit_or_conflict(db, detail) contextmanager
+        +ensure_no_tasks(db, resource_id, environment_id, detail) None
+        +download_response(data, filename) Response
+        +get_accessible_project(db, pid, user, write) Resource
+    }
+    class Deps {
+        +current_user(token, db) User
+        +require_roles(*roles) Callable
+        +ensure_project_access(db, pid, user, write) None
+        +admin : Depends
+    }
+    class CrudCommon {
+        +model_to_dict(model, extra, exclude, defaults) dict
+        +remove_resource_files(db, bucket, resource_id) None
+    }
+    class TaskCrud {
+        +task_to_dict(task, project, env, framework) dict
+        +task_select_with_names() Select
+        +get_task_with_names(db, id) tuple
+    }
+    class EnvironmentCrud {
+        +environment_to_dict(item, framework, owner) dict
+        +refresh_update_state(db, item) None
+    }
+    class ResourceCrud {
+        +framework_out(db, item) dict
+        +get_resource(db, id, type) Resource
+    }
+    class Endpoints {
+        +list/create/get/delete 各资源
+    }
+
+    Endpoints ..> ApiHelpers : 调用
+    Endpoints ..> Deps : 依赖注入
+    Endpoints ..> TaskCrud
+    Endpoints ..> EnvironmentCrud
+    Endpoints ..> ResourceCrud
+    ApiHelpers ..> Deps : import admin/ensure_project_access
+    ApiHelpers ..> ResourceCrud : get_resource
+    ApiHelpers ..> CrudCommon : 复用
+    TaskCrud ..> CrudCommon : model_to_dict
+    EnvironmentCrud ..> CrudCommon : model_to_dict
+    ResourceCrud ..> CrudCommon : model_to_dict

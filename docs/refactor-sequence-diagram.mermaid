@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant C as 客户端
+    participant EP as Endpoints
+    participant AH as api.helpers
+    participant CR as crud
+    participant DB as SQLAlchemy Session
+    participant S3 as MinIO
+
+    Note over C,S3: ① 创建项目（唯一冲突封装）
+    C->>EP: POST /objects/projects
+    EP->>EP: Depends(admin) 鉴权
+    EP->>DB: add(Resource)
+    EP->>AH: commit_or_conflict(db, "测试项目名称已存在")
+    AH->>DB: commit()
+    DB-->>AH: IntegrityError(可选)
+    AH-->>EP: 409 / 成功
+    EP-->>C: ResourceOut
+
+    Note over C,S3: ② 列表任务（model_to_dict 名称化）
+    C->>EP: GET /tasks
+    EP->>CR: task_select_with_names()
+    CR->>DB: execute(select + outerjoin)
+    DB-->>CR: rows
+    EP->>CR: task_to_dict(row...)
+    CR->>CR: model_to_dict(task, extra={*_name}, exclude={config_content})
+    CR-->>EP: dict
+    EP-->>C: list[TaskOut]
+
+    Note over C,S3: ③ 删除项目（任务校验 + 文件清理）
+    C->>EP: DELETE /objects/projects/{id}
+    EP->>AH: get_or_404(get_resource(...), "测试项目不存在")
+    EP->>AH: ensure_no_tasks(db, resource_id=id, detail=...)
+    AH->>DB: select(Task.id).limit(1)
+    DB-->>AH: 命中 -> 409
+    EP->>CR: remove_resource_files(db, project_bucket, id)
+    CR->>DB: select(ResourceFile)
+    CR->>S3: storage.remove(bucket, key) 循环
+    CR->>DB: delete(ResourceFile) + delete(Resource)
+    EP->>DB: commit()
+    EP-->>C: {"message": "已删除"}

@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: testplatform-pg
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-testplatform}
+      POSTGRES_USER: ${POSTGRES_USER:-testplatform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-testplatform123}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-testplatform} -d ${POSTGRES_DB:-testplatform}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: testplatform-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: testplatform-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    image: testplatform-backend:v1
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: testplatform-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-testplatform}:${POSTGRES_PASSWORD:-testplatform123}@postgres:5432/${POSTGRES_DB:-testplatform}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret-before-production}
+      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-admin}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-admin123}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://127.0.0.1}
+      AGENT_PUBLIC_URL: ${AGENT_PUBLIC_URL:-}
+      AGENT_IMAGE: ${AGENT_IMAGE:-kw-agent:latest}
+      RUNTIME_IMAGE: ${RUNTIME_IMAGE:-kw-executor-runtime:latest}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    restart: unless-stopped
+
+  frontend:
+    image: testplatform-frontend:v1
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: testplatform-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+    name: testplatform_v1_pg_data
+  redis_data:
+    name: testplatform_v1_redis_data
+  minio_data:
+    name: testplatform_v1_minio_data

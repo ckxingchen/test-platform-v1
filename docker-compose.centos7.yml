@@ -1,0 +1,6 @@
+# CentOS 7 + Docker 20.10 的默认 seccomp 会拒绝新 glibc 使用的 clone3，
+# 导致 Python 报 can't start new thread。现代 Linux 不需要此覆盖文件。
+services:
+  backend:
+    security_opt:
+      - seccomp=unconfined

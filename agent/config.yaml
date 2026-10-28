@@ -1,0 +1,16 @@
+# kw-agent 配置模板（实际配置由平台部署 Agent 时生成到 config/config.yaml）
+platform:
+  url: http://192.168.1.100:8000
+
+agent:
+  executor_id: 1
+  name: agent-01
+  work_dir: ../data
+  max_workers: 3
+  heartbeat_interval: 10
+  task_poll_interval: 3
+  default_timeout: 3600
+
+log:
+  level: INFO
+  file: ../logs/agent.log

@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant U as 用户
+    participant TC as TaskCreate.vue
+    participant ENV as GET /environments
+    participant API as POST /tasks
+    participant DB as PostgreSQL
+    participant CMD as agent_commands
+
+    U->>TC: 打开「新建任务」
+    TC->>ENV: GET /environments
+    ENV->>DB: SELECT env JOIN object_resources(framework) 组装冗余字段
+    DB-->>ENV: env + framework_name/os/arch
+    ENV-->>TC: 执行器下拉数据(含框架名/OS-arch/部署状态)
+    TC->>TC: 字段顺序：测试项目→执行器；显示 执行器/框架(OS-arch)/部署状态
+    U->>TC: 选项目+执行器，填配置，勾选用例，提交
+    TC->>API: POST /tasks {project_id, environment_id, selected_case_paths, config_content}
+    API->>API: viewer 拒绝；ensure_project_access(project_id, user, write=true)
+    API->>API: _ready_environment() 校验 deploy_status=ready + agent=online
+    API->>DB: 冻结 ResourceFile → TaskFile 快照
+    API->>DB: INSERT agent_tasks(status=queued)
+    API->>DB: INSERT agent_commands(run_task) enqueue_command
+    DB-->>API: task
+    API-->>TC: TaskOut(含 project_name/environment_name/framework_name)
+    TC->>U: 跳转 /tasks/{id}
+    Note over CMD: Agent 心跳 lease 后领取 run_task

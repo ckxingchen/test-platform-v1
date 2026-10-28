@@ -1,0 +1,86 @@
+classDiagram
+    class User {
+        +int id
+        +str username
+        +str role  "admin/developer/viewer"
+        +bool enabled
+    }
+    class Resource {
+        +int id
+        +str resource_type  "project/framework"
+        +str name
+        +str os
+        +str arch
+        +dict metadata_json
+        +bool enabled
+        +int created_by
+    }
+    class ResourceFile {
+        +int id
+        +int resource_id
+        +str relative_path
+        +str object_key
+        +str sha256
+        +int size
+    }
+    class ResourceMember {
+        +int resource_id
+        +int user_id
+        +str role
+    }
+    class Environment {
+        +int id
+        +str name
+        +str host
+        +str work_root
+        +int max_concurrency
+        +int framework_id
+        +str agent_status
+        +str deploy_status
+        +str os_family
+        +str arch
+        +str deployed_framework_sha256
+        +int owner_id  "新增"
+        +str group_name  "新增"
+        +list tags  "新增"
+        +bool enabled
+    }
+    class Deployment {
+        +int id
+        +int environment_id
+        +str framework_sha256
+        +str status
+        +int created_by
+    }
+    class Task {
+        +int id
+        +int project_id
+        +int environment_id
+        +int framework_id
+        +str framework_sha256
+        +str status
+        +dict testcase_scope
+        +list selected_case_paths
+        +int created_by
+    }
+    class AgentCommand {
+        +int id
+        +int environment_id
+        +str command_type
+        +dict payload
+        +str status
+        +str lease_id
+        +int task_id
+        +int deployment_id
+    }
+
+    User "1" --> "N" Resource : created_by
+    Resource "1" --> "N" ResourceFile : files
+    Resource "1" --> "N" ResourceMember : members
+    User "1" --> "N" ResourceMember : member
+    Resource "1" --> "N" Environment : framework_id
+    User "0..1" --> "N" Environment : owner_id
+    Environment "1" --> "N" Deployment : deployments
+    Environment "1" --> "N" Task : runs
+    Resource "1" --> "N" Task : project_id
+    Environment "1" --> "N" AgentCommand : commands
